@@ -1,5 +1,6 @@
 package com.healthy.auth.dto;
 
+import com.healthy.common.validation.StrongPassword;
 import com.healthy.usuario.Perfil;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
@@ -12,7 +13,7 @@ public record CadastroRequest(
         @NotNull Perfil perfil,
         @NotBlank @Size(min = 3, max = 100) String nome,
         @NotBlank @Email @Size(max = 100) String email,
-        @NotBlank @Size(min = 6, max = 72) String senha,
+        @NotBlank @StrongPassword String senha,
         @Size(max = 40) String crm,
         @Size(max = 60) String especialidade) {
 

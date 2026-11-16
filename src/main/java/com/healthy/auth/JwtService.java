@@ -1,5 +1,6 @@
 package com.healthy.auth;
 
+import com.healthy.config.SecurityConfig;
 import com.healthy.usuario.Usuario;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -27,16 +28,20 @@ public class JwtService {
         this.propriedades = propriedades;
     }
 
+    /** Nome do claim com a versão dos tokens do usuário (ver Usuario.tokenVersion). */
+    public static final String TOKEN_VERSION_CLAIM = "ver";
+
     public String generate(Usuario usuario) {
         Instant agora = Instant.now();
 
         JwtClaimsSet dados = JwtClaimsSet.builder()
-                .issuer("healthy-api")
+                .issuer(SecurityConfig.JWT_ISSUER)
                 .issuedAt(agora)
                 .expiresAt(agora.plus(propriedades.expiracao()))
                 .subject(String.valueOf(usuario.getId())) // "sub": o id de quem é o dono do token
                 .claim("perfil", usuario.getPerfil().name()) // usado para liberar /pacientes ou /medicos
                 .claim("nome", usuario.getNome())
+                .claim(TOKEN_VERSION_CLAIM, usuario.getTokenVersion()) // trocar a senha invalida este token
                 .build();
 
         JwsHeader cabecalho = JwsHeader.with(MacAlgorithm.HS256).build();

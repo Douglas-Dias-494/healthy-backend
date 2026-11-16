@@ -1,8 +1,10 @@
 package com.healthy.auth;
 
+import com.healthy.security.RateLimiter;
 import com.healthy.usuario.Usuario;
 import com.healthy.usuario.UsuarioRepository;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -35,13 +37,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class AuthControllerTest {
 
-    private static final String PASSWORD = "123456";
+    private static final String PASSWORD = "123456"; // senha dos usuários de teste (DadosIniciais)
+    private static final String STRONG_PASSWORD = "Segredo2026"; // cumpre a política de senha (cadastros novos)
 
     @Autowired
     private MockMvc mvc;
 
     @Autowired
     private UsuarioRepository users;
+
+    @Autowired
+    private RateLimiter limiter;
+
+    @BeforeEach
+    void resetRateLimiter() {
+        limiter.clearAll(); // o limitador vive na memória e é compartilhado entre os testes
+    }
 
     // ---------- Login ----------
 
@@ -73,7 +84,7 @@ class AuthControllerTest {
     void signUpAlsoIgnoresInvalidTokenInHeader() throws Exception {
         mvc.perform(post("/api/auth/cadastro").contentType(MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token.velho.invalido")
-                        .content("{\"perfil\":\"PACIENTE\",\"nome\":\"Nova Pessoa\",\"email\":\"nova.pessoa@teste.com\",\"senha\":\"123456\"}"))
+                        .content("{\"perfil\":\"PACIENTE\",\"nome\":\"Nova Pessoa\",\"email\":\"nova.pessoa@teste.com\",\"senha\":\"Segredo2026\"}"))
                 .andExpect(status().isCreated());
     }
 
@@ -116,20 +127,20 @@ class AuthControllerTest {
 
     @Test
     void patientSignUpCreatesAccountWithHashedPassword() throws Exception {
-        signUp("PACIENTE", "Ana Paula", "ana.paula@teste.com", PASSWORD, null, null)
+        signUp("PACIENTE", "Ana Paula", "ana.paula@teste.com", STRONG_PASSWORD, null, null)
                 .andExpect(status().isCreated());
 
         Usuario created = users.findByEmail("ana.paula@teste.com").orElseThrow();
-        assertThat(created.getSenhaHash()).isNotEqualTo(PASSWORD).startsWith("$2"); // $2a$... = BCrypt
+        assertThat(created.getSenhaHash()).isNotEqualTo(STRONG_PASSWORD).startsWith("$2"); // $2a$... = BCrypt
         assertThat(created.getCrm()).isNull();
 
         // e a conta nova já consegue entrar
-        login("PACIENTE", "ana.paula@teste.com", PASSWORD).andExpect(status().isOk());
+        login("PACIENTE", "ana.paula@teste.com", STRONG_PASSWORD).andExpect(status().isOk());
     }
 
     @Test
     void doctorSignUpStoresCrmAndSpecialty() throws Exception {
-        signUp("MEDICO", "Dr. Pedro", "pedro@teste.com", PASSWORD, "CRM-MG 55555", "Pediatria")
+        signUp("MEDICO", "Dr. Pedro", "pedro@teste.com", STRONG_PASSWORD, "CRM-MG 55555", "Pediatria")
                 .andExpect(status().isCreated());
 
         Usuario created = users.findByEmail("pedro@teste.com").orElseThrow();
@@ -139,14 +150,14 @@ class AuthControllerTest {
 
     @Test
     void doctorWithoutCrmReturns400() throws Exception {
-        signUp("MEDICO", "Dr. Pedro", "pedro2@teste.com", PASSWORD, null, null)
+        signUp("MEDICO", "Dr. Pedro", "pedro2@teste.com", STRONG_PASSWORD, null, null)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erros.doctorDataComplete").exists());
     }
 
     @Test
     void duplicateEmailReturns409EvenWithDifferentCase() throws Exception {
-        signUp("PACIENTE", "Outra Maria", "PACIENTE@healthy.com", PASSWORD, null, null)
+        signUp("PACIENTE", "Outra Maria", "PACIENTE@healthy.com", STRONG_PASSWORD, null, null)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("Já existe uma conta com este e-mail."));
     }

@@ -43,4 +43,16 @@ public class Usuario {
 
     @Column(length = 60)
     private String especialidade;
+
+    /**
+     * Versão dos tokens deste usuário. Todo JWT carrega a versão com que foi emitido, e só vale se ela for
+     * igual à atual (ver PasswordChangeTokenValidator). Trocar a senha soma 1 e encerra todas as sessões antigas.
+     */
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion;
+
+    /** Invalida todos os tokens já emitidos para este usuário. */
+    public void invalidateSessions() {
+        tokenVersion++;
+    }
 }

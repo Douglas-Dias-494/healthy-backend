@@ -1,9 +1,11 @@
 package com.healthy.patient;
 
 import com.healthy.patient.dto.AppointmentResponse;
+import com.healthy.patient.dto.PatientProfileResponse;
 import com.healthy.patient.dto.PrescriptionResponse;
 import com.healthy.patient.dto.StartTrackingRequest;
 import com.healthy.patient.dto.TrackingResponse;
+import com.healthy.patient.dto.UpdatePatientProfileRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -29,9 +32,24 @@ import java.util.List;
 public class PatientAreaController {
 
     private final PatientAreaService service;
+    private final PatientProfileService profileService;
 
-    public PatientAreaController(PatientAreaService service) {
+    public PatientAreaController(PatientAreaService service, PatientProfileService profileService) {
         this.service = service;
+        this.profileService = profileService;
+    }
+
+    /** A ficha do paciente (nome, e-mail, CPF, nascimento, telefone). CPF etc. vêm null até ele preencher. */
+    @GetMapping("/ficha")
+    public PatientProfileResponse getProfile(@AuthenticationPrincipal Jwt jwt) {
+        return profileService.getProfile(patientId(jwt));
+    }
+
+    /** Cria ou atualiza a ficha. 200 | 400 dados inválidos (CPF inválido...) | 409 CPF de outra conta. */
+    @PutMapping("/ficha")
+    public PatientProfileResponse updateProfile(
+            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdatePatientProfileRequest request) {
+        return profileService.updateProfile(patientId(jwt), request);
     }
 
     @GetMapping("/atendimentos")

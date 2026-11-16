@@ -1,7 +1,11 @@
 package com.healthy.doctor;
 
+import com.healthy.doctor.dto.NewAppointmentRequest;
 import com.healthy.doctor.dto.NewPrescriptionRequest;
+import com.healthy.doctor.dto.PatientLookupRequest;
+import com.healthy.doctor.dto.PatientLookupResponse;
 import com.healthy.doctor.dto.PatientSeenResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,6 +36,20 @@ public class DoctorAreaController {
     @GetMapping("/pacientes")
     public List<PatientSeenResponse> listPatients(@AuthenticationPrincipal Jwt jwt) {
         return service.listPatients(doctorId(jwt));
+    }
+
+    /** Busca um paciente pelo e-mail exato. 200 {id, nome} | 404 não encontrado | 429 buscas demais. */
+    @PostMapping("/pacientes/busca")
+    public PatientLookupResponse findPatientByEmail(
+            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PatientLookupRequest request, HttpServletRequest http) {
+        return service.findPatientByEmail(doctorId(jwt), request.email(), http.getRemoteAddr());
+    }
+
+    /** Registra um atendimento (associa médico e paciente). 201 | 400 | 404 paciente | 409 duplicado. */
+    @PostMapping("/atendimentos")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void registerAppointment(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NewAppointmentRequest request) {
+        service.registerAppointment(doctorId(jwt), request);
     }
 
     /** 201 sem corpo | 400 dados inválidos | 403 paciente não é do médico. */

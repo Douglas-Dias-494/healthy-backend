@@ -2,16 +2,26 @@ package com.healthy.doctor;
 
 import com.healthy.appointment.Appointment;
 import com.healthy.appointment.AppointmentRepository;
+import com.healthy.common.ConflictException;
+import com.healthy.common.Emails;
 import com.healthy.common.ForbiddenOperationException;
+import com.healthy.common.ResourceNotFoundException;
+import com.healthy.doctor.dto.NewAppointmentRequest;
 import com.healthy.doctor.dto.NewPrescriptionRequest;
+import com.healthy.doctor.dto.PatientLookupResponse;
 import com.healthy.doctor.dto.PatientSeenResponse;
 import com.healthy.prescription.PrescribedMedication;
 import com.healthy.prescription.Prescription;
 import com.healthy.prescription.PrescriptionRepository;
+import com.healthy.security.AttemptGuard;
+import com.healthy.usuario.Perfil;
+import com.healthy.usuario.Usuario;
 import com.healthy.usuario.UsuarioRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,15 +31,68 @@ import java.util.Map;
 @Service
 public class DoctorAreaService {
 
+    private static final int LOOKUPS_PER_MINUTE = 30;
+
     private final AppointmentRepository appointments;
     private final PrescriptionRepository prescriptions;
     private final UsuarioRepository users;
+    private final AttemptGuard attempts;
 
     public DoctorAreaService(
-            AppointmentRepository appointments, PrescriptionRepository prescriptions, UsuarioRepository users) {
+            AppointmentRepository appointments,
+            PrescriptionRepository prescriptions,
+            UsuarioRepository users,
+            AttemptGuard attempts) {
         this.appointments = appointments;
         this.prescriptions = prescriptions;
         this.users = users;
+        this.attempts = attempts;
+    }
+
+    /**
+     * Procura um paciente pelo e-mail EXATO (não existe listagem de todos os pacientes: isso exporia dados
+     * de saúde). Devolve só id e nome. Limitado a 30 buscas por minuto por médico, para ninguém usar isto
+     * como detector de e-mails cadastrados.
+     */
+    @Transactional(readOnly = true)
+    public PatientLookupResponse findPatientByEmail(Long doctorId, String rawEmail, String ip) {
+        String key = "patient-lookup:" + doctorId;
+        attempts.check("patient-lookup", key, LOOKUPS_PER_MINUTE, Duration.ofMinutes(1), ip);
+        attempts.record(key);
+
+        return users.findByEmail(Emails.normalize(rawEmail))
+                .filter(user -> user.getPerfil() == Perfil.PACIENTE)
+                .map(PatientLookupResponse::from)
+                .orElseThrow(() -> new ResourceNotFoundException("Nenhum paciente encontrado com este e-mail."));
+    }
+
+    /**
+     * Registra que o médico atendeu um paciente. É isto que "associa" os dois: a partir daqui o paciente vê o
+     * médico na sua lista, o médico vê o paciente, e o médico pode emitir receitas para ele.
+     */
+    @Transactional
+    public void registerAppointment(Long doctorId, NewAppointmentRequest request) {
+        Usuario patient = users.findById(request.patientId())
+                .filter(user -> user.getPerfil() == Perfil.PACIENTE)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado."));
+
+        if (appointments.existsByDoctorIdAndPatientIdAndDate(doctorId, patient.getId(), request.date())) {
+            throw new ConflictException("Já existe um atendimento deste paciente nesta data.");
+        }
+
+        Appointment appointment = new Appointment();
+        appointment.setDoctor(users.getReferenceById(doctorId));
+        appointment.setPatient(patient);
+        appointment.setDate(request.date());
+        appointment.setLocation(request.location().trim());
+        appointment.setReason(request.reason().trim());
+
+        try {
+            appointments.saveAndFlush(appointment);
+        } catch (DataIntegrityViolationException e) {
+            // Dois envios simultâneos do mesmo atendimento: a restrição UNIQUE do banco decide
+            throw new ConflictException("Já existe um atendimento deste paciente nesta data.");
+        }
     }
 
     /**

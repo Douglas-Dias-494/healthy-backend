@@ -21,4 +21,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     /** O médico já atendeu este paciente? (regra para poder emitir receita) */
     boolean existsByDoctorIdAndPatientId(Long doctorId, Long patientId);
+
+    /** Já existe esse atendimento (mesmo médico, paciente e data)? Evita registro duplicado. */
+    boolean existsByDoctorIdAndPatientIdAndDate(Long doctorId, Long patientId, java.time.LocalDate date);
 }

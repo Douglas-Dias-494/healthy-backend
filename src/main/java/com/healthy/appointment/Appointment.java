@@ -10,7 +10,10 @@ import java.time.LocalDate;
 
 /** Uma consulta: um paciente atendido por um médico, em certa data e local. */
 @Entity
-@Table(name = "appointments")
+@Table(
+        name = "appointments",
+        // O mesmo atendimento (médico + paciente + data) não se repete. Criada na migração V2.
+        uniqueConstraints = @UniqueConstraint(columnNames = {"doctor_id", "patient_id", "appointment_date"}))
 @Getter
 @Setter
 @NoArgsConstructor

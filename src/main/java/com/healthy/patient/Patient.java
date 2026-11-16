@@ -1,4 +1,4 @@
-package com.healthy.entities;
+package com.healthy.patient;
 
 import jakarta.persistence.*;
 import lombok.Getter;

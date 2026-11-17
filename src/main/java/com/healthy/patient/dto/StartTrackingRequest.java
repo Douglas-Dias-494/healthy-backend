@@ -10,12 +10,6 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-/**
- * Corpo de POST /api/pacientes/me/acompanhamentos (espelha AtivarAcompanhamentoRequest do Angular).
- *
- * O Angular também envia "dosagem", mas o servidor IGNORA: a dosagem é lida da própria receita.
- * Nunca confie em dados que o cliente poderia forjar quando o servidor já os conhece.
- */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record StartTrackingRequest(
         @JsonProperty("receitaId") @NotNull Long prescriptionId,

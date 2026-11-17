@@ -11,12 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
-/**
- * Gera o token JWT do usuário logado.
- * Um JWT é um texto assinado com 3 partes: cabeçalho.dados.assinatura. Qualquer um consegue LER os dados
- * (por isso nunca ponha senha neles), mas só quem tem a chave consegue ASSINAR, então ninguém falsifica.
- * A validação nas requisições seguintes é feita pelo Spring Security (ver SecurityConfig).
- */
 @Service
 public class JwtService {
 
@@ -28,20 +22,20 @@ public class JwtService {
         this.propriedades = propriedades;
     }
 
-    /** Nome do claim com a versão dos tokens do usuário (ver Usuario.tokenVersion). */
     public static final String TOKEN_VERSION_CLAIM = "ver";
 
     public String generate(Usuario usuario) {
         Instant agora = Instant.now();
 
+        // A JWT is signed, not encrypted: anyone can read the claims, so never put secrets in them.
         JwtClaimsSet dados = JwtClaimsSet.builder()
                 .issuer(SecurityConfig.JWT_ISSUER)
                 .issuedAt(agora)
                 .expiresAt(agora.plus(propriedades.expiracao()))
-                .subject(String.valueOf(usuario.getId())) // "sub": o id de quem é o dono do token
-                .claim("perfil", usuario.getPerfil().name()) // usado para liberar /pacientes ou /medicos
+                .subject(String.valueOf(usuario.getId()))
+                .claim("perfil", usuario.getPerfil().name())
                 .claim("nome", usuario.getNome())
-                .claim(TOKEN_VERSION_CLAIM, usuario.getTokenVersion()) // trocar a senha invalida este token
+                .claim(TOKEN_VERSION_CLAIM, usuario.getTokenVersion())
                 .build();
 
         JwsHeader cabecalho = JwsHeader.with(MacAlgorithm.HS256).build();

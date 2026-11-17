@@ -27,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Regras da área do médico. O id do médico vem sempre do TOKEN, nunca do corpo da requisição. */
 @Service
 public class DoctorAreaService {
 
@@ -49,13 +48,9 @@ public class DoctorAreaService {
         this.attempts = attempts;
     }
 
-    /**
-     * Procura um paciente pelo e-mail EXATO (não existe listagem de todos os pacientes: isso exporia dados
-     * de saúde). Devolve só id e nome. Limitado a 30 buscas por minuto por médico, para ninguém usar isto
-     * como detector de e-mails cadastrados.
-     */
     @Transactional(readOnly = true)
     public PatientLookupResponse findPatientByEmail(Long doctorId, String rawEmail, String ip) {
+        // There is no patient listing (it would expose health data): exact e-mail only, id and name only, rate limited.
         String key = "patient-lookup:" + doctorId;
         attempts.check("patient-lookup", key, LOOKUPS_PER_MINUTE, Duration.ofMinutes(1), ip);
         attempts.record(key);
@@ -66,10 +61,6 @@ public class DoctorAreaService {
                 .orElseThrow(() -> new ResourceNotFoundException("Nenhum paciente encontrado com este e-mail."));
     }
 
-    /**
-     * Registra que o médico atendeu um paciente. É isto que "associa" os dois: a partir daqui o paciente vê o
-     * médico na sua lista, o médico vê o paciente, e o médico pode emitir receitas para ele.
-     */
     @Transactional
     public void registerAppointment(Long doctorId, NewAppointmentRequest request) {
         Usuario patient = users.findById(request.patientId())
@@ -90,18 +81,13 @@ public class DoctorAreaService {
         try {
             appointments.saveAndFlush(appointment);
         } catch (DataIntegrityViolationException e) {
-            // Dois envios simultâneos do mesmo atendimento: a restrição UNIQUE do banco decide
             throw new ConflictException("Já existe um atendimento deste paciente nesta data.");
         }
     }
 
-    /**
-     * Pacientes do médico, um por paciente, com o atendimento mais recente.
-     * As consultas chegam da mais nova para a mais antiga: ao guardar só a PRIMEIRA de cada paciente,
-     * sobra a mais recente. LinkedHashMap preserva essa ordem.
-     */
     @Transactional(readOnly = true)
     public List<PatientSeenResponse> listPatients(Long doctorId) {
+        // Appointments arrive newest first: keeping only the first one per patient leaves the latest.
         Map<Long, Appointment> latestByPatient = new LinkedHashMap<>();
         for (Appointment appointment : appointments.findByDoctorIdOrderByDateDescIdDesc(doctorId)) {
             latestByPatient.putIfAbsent(appointment.getPatient().getId(), appointment);
@@ -111,7 +97,7 @@ public class DoctorAreaService {
 
     @Transactional
     public void issuePrescription(Long doctorId, NewPrescriptionRequest request) {
-        // REGRA DE NEGÓCIO: só emite receita para quem o médico já atendeu.
+        // Business rule: prescriptions only for patients this doctor has already attended.
         if (!appointments.existsByDoctorIdAndPatientId(doctorId, request.patientId())) {
             throw new ForbiddenOperationException("Este paciente não está associado a você.");
         }
@@ -119,7 +105,7 @@ public class DoctorAreaService {
         Prescription prescription = new Prescription();
         prescription.setDoctor(users.getReferenceById(doctorId));
         prescription.setPatient(users.getReferenceById(request.patientId()));
-        prescription.setDate(LocalDate.now()); // a data é do servidor: o cliente não escolhe
+        prescription.setDate(LocalDate.now());
         prescription.setNotes(request.notes() == null || request.notes().isBlank() ? null : request.notes().trim());
         request.medications().forEach(medication -> prescription.getItems().add(new PrescribedMedication(
                 medication.name().trim(),

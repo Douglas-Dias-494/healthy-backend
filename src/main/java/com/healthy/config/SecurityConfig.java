@@ -36,7 +36,6 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    /** Emissor gravado no token (JwtService) e exigido na validação. */
     public static final String JWT_ISSUER = "healthy-api";
 
     private static final List<String> PUBLIC_ROUTES = List.of(
@@ -51,49 +50,35 @@ public class SecurityConfig {
         this.h2ConsoleEnabled = h2ConsoleEnabled;
     }
 
-    /** A "porta de entrada" da API: define quem pode chamar o quê. */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF protege sessões em cookie. Esta API é stateless e usa o token no cabeçalho
-                // Authorization (que o navegador não envia sozinho), então não se aplica.
+                // CSRF only matters for cookie sessions; this API is stateless and reads the token from the Authorization header.
                 .csrf(csrf -> csrf.disable())
-                // Usa o CorsConfigurationSource definido em CorsConfig
                 .cors(Customizer.withDefaults())
-                // Sem sessão no servidor: cada requisição se prova com o token
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> {
-                    // Não manda o endereço da página de origem quando o usuário clica num link
-                    // (o link de recuperação de senha leva um token na URL)
                     headers.referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER));
-                    // Esta API nunca precisa de câmera, microfone nem localização
                     headers.permissionsPolicyHeader(policy -> policy.policy("camera=(), microphone=(), geolocation=(), payment=()"));
-                    // Só é enviado em conexões HTTPS (em HTTP o navegador o ignoraria de qualquer forma)
                     headers.httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000));
                     if (h2ConsoleEnabled) {
-                        // O console do H2 é uma página com <frame> e scripts próprios; só funciona assim (dev)
+                        // The H2 console uses frames; this branch only exists when the console is enabled (dev).
                         headers.frameOptions(frame -> frame.sameOrigin());
                     } else {
                         headers.frameOptions(frame -> frame.deny());
-                        // A API só devolve JSON: nenhum conteúdo ativo, e ninguém pode embuti-la em <iframe>
                         headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"));
                     }
                 })
                 .authorizeHttpRequests(rules -> {
-                    // Públicos: só o que é necessário para entrar ou recuperar o acesso
                     rules.requestMatchers(HttpMethod.POST, PUBLIC_ROUTES.toArray(String[]::new)).permitAll();
-                    // Console do H2: só existe quando ligado (perfil dev)
                     if (h2ConsoleEnabled) {
                         rules.requestMatchers("/h2-console/**").permitAll();
                     }
-                    // Área por perfil: o perfil vem do token (claim "perfil" -> ROLE_PACIENTE / ROLE_MEDICO)
                     rules.requestMatchers("/api/pacientes/**").hasRole("PACIENTE");
                     rules.requestMatchers("/api/medicos/**").hasRole("MEDICO");
-                    // Todo o resto exige estar logado (ex.: /api/auth/me).
-                    // Regra de ouro: o que não foi liberado acima é bloqueado.
+                    // Deny by default: anything not allowed above requires a valid token.
                     rules.anyRequest().authenticated();
                 })
-                // Valida o "Authorization: Bearer <token>" de cada requisição
                 .oauth2ResourceServer(oauth -> oauth
                         .bearerTokenResolver(ignoreTokenOnPublicRoutes())
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(profileAuthoritiesConverter())));
@@ -101,17 +86,13 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * Por padrão o Spring valida o token ANTES de checar se a rota é pública. Resultado: quem tem um token
-     * vencido guardado no navegador recebia 401 até ao tentar fazer login de novo.
-     * Aqui, nas rotas públicas o cabeçalho Authorization é simplesmente ignorado.
-     */
+    // Spring validates the bearer token before checking route permissions, so an expired token stored in the
+    // browser would block even the login. On public routes the Authorization header is ignored.
     private BearerTokenResolver ignoreTokenOnPublicRoutes() {
         DefaultBearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
         return request -> PUBLIC_ROUTES.contains(request.getRequestURI()) ? null : defaultResolver.resolve(request);
     }
 
-    /** Transforma o claim "perfil" do token em permissão: "MEDICO" vira ROLE_MEDICO. */
     private JwtAuthenticationConverter profileAuthoritiesConverter() {
         JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
         authorities.setAuthoritiesClaimName("perfil");
@@ -122,24 +103,19 @@ public class SecurityConfig {
         return converter;
     }
 
-    /** BCrypt: transforma a senha num hash lento e com "sal" aleatório. Não tem como desfazer. */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /** Assina (cria) os tokens. */
     @Bean
     public JwtEncoder jwtEncoder(JwtProperties properties) {
         return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey(properties)));
     }
 
-    /**
-     * Confere cada token recebido: assinatura, validade, emissor, e a regra extra
-     * "emitido depois da última troca de senha" (PasswordChangeTokenValidator).
-     */
     @Bean
     public JwtDecoder jwtDecoder(JwtProperties properties, PasswordChangeTokenValidator passwordChangeValidator) {
+        // Beyond signature, expiry and issuer, the token must carry the user's current token version.
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey(properties))
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
@@ -150,7 +126,6 @@ public class SecurityConfig {
 
     private static SecretKey secretKey(JwtProperties properties) {
         byte[] bytes = properties.secret().getBytes(StandardCharsets.UTF_8);
-        // HS256 exige chave de pelo menos 256 bits (32 bytes). Melhor falhar na partida do que rodar fraco.
         if (bytes.length < 32) {
             throw new IllegalStateException("healthy.jwt.secret precisa ter pelo menos 32 caracteres.");
         }

@@ -4,11 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * Registro de eventos de segurança, num logger próprio ("security"), para poder ser enviado a um arquivo
- * ou sistema de alertas. Regras: NUNCA registrar senha, token nem link de recuperação, e mascarar e-mails.
- * Serve para investigar ataques (muitas falhas de login do mesmo IP) e para auditoria.
- */
+/** Security events in a dedicated logger. Never logs passwords, tokens or reset links; e-mails are masked. */
 @Component
 public class SecurityAuditLogger {
 
@@ -46,7 +42,6 @@ public class SecurityAuditLogger {
         log.info("event=PASSWORD_CHANGED userId={} ip={}", userId, ip);
     }
 
-    /** "maria@exemplo.com" vira "m***@exemplo.com": dá para correlacionar sem expor o endereço inteiro. */
     static String maskEmail(String email) {
         int at = email == null ? -1 : email.indexOf('@');
         if (at < 1) {

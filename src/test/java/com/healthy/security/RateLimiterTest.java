@@ -12,7 +12,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Teste unitário (sem Spring): o relógio é controlado, então "esperar 15 minutos" é instantâneo. */
 class RateLimiterTest {
 
     private static final Duration WINDOW = Duration.ofMinutes(15);
@@ -51,7 +50,6 @@ class RateLimiterTest {
 
         assertThatThrownBy(() -> limiter.requireBelow("k", 5, WINDOW))
                 .isInstanceOfSatisfying(TooManyRequestsException.class, e ->
-                        // 10 minutos restantes (15 - 5), mais 1 s de folga
                         assertThat(e.getRetryAfterSeconds()).isBetween(600L, 601L));
     }
 
@@ -67,15 +65,13 @@ class RateLimiterTest {
 
     @Test
     void slidingWindowOnlyCountsRecentEvents() {
-        limiter.record("k"); // t = 0
+        limiter.record("k");
         clock.advance(Duration.ofMinutes(10));
         for (int i = 0; i < 4; i++) {
-            limiter.record("k"); // t = 10 min
+            limiter.record("k");
         }
-        // 5 eventos dentro de 15 min: bloqueia...
         assertThatThrownBy(() -> limiter.requireBelow("k", 5, WINDOW)).isInstanceOf(TooManyRequestsException.class);
 
-        // ...mas 6 min depois o primeiro (t = 0) saiu da janela e sobram 4
         clock.advance(Duration.ofMinutes(6));
         assertThatCode(() -> limiter.requireBelow("k", 5, WINDOW)).doesNotThrowAnyException();
     }

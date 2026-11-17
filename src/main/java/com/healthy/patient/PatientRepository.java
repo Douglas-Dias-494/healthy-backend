@@ -8,7 +8,6 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
 
     Optional<Patient> findByUsuarioId(Long usuarioId);
 
-    /** Já existe OUTRO paciente com este CPF? (o próprio pode reenviar o seu) */
     boolean existsByCpfAndUsuarioIdNot(String cpf, Long usuarioId);
 
     boolean existsByCpf(String cpf);

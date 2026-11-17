@@ -6,7 +6,6 @@ import com.healthy.prescription.Prescription;
 import java.time.LocalDate;
 import java.util.List;
 
-/** Espelha Receita do Angular. */
 public record PrescriptionResponse(
         Long id,
         @JsonProperty("medico") DoctorSummaryResponse doctor,

@@ -1,6 +1,5 @@
 package com.healthy.common;
 
-/** Limite de tentativas excedido. Responde 429 com o cabeçalho Retry-After. */
 public class TooManyRequestsException extends RuntimeException {
 
     private final long retryAfterSeconds;

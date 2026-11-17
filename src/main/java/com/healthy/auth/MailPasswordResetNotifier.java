@@ -10,10 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-/**
- * Produção: envia o link por e-mail. {@code @Async} faz o envio rodar em segundo plano, para a resposta da
- * API não esperar o servidor SMTP (e não revelar, pela demora, se o e-mail tem conta).
- */
 @Component
 @Profile("prod")
 public class MailPasswordResetNotifier implements PasswordResetNotifier {

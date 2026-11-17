@@ -12,18 +12,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Limitador de tentativas por "janela deslizante", em memória.
- *
- * Funciona assim: cada chave (ex.: "login-email:maria@x.com") guarda os instantes dos eventos recentes.
- * {@link #requireBelow} recusa se, dentro da janela, já houve eventos demais; {@link #record} registra um.
- *
- * Limites desta versão: o estado vive na memória de UM servidor. Com vários servidores (ou após reiniciar)
- * cada um conta por conta própria; para isso um Redis seria o próximo passo.
+ * Sliding-window rate limiter kept in memory: state is per instance and lost on restart.
+ * With several servers, move it to Redis (or use the reverse proxy's limiter).
  */
 @Component
 public class RateLimiter {
 
-    /** Acima disto, entradas antigas são varridas para a memória não crescer sem fim. */
     private static final int CLEANUP_THRESHOLD = 10_000;
     private static final Duration KEEP_FOR = Duration.ofHours(2);
 
@@ -34,7 +28,6 @@ public class RateLimiter {
         this.clock = clock;
     }
 
-    /** Registra um evento (tentativa) para a chave. */
     public void record(String key) {
         Deque<Instant> deque = events.computeIfAbsent(key, k -> new ArrayDeque<>());
         synchronized (deque) {
@@ -45,10 +38,6 @@ public class RateLimiter {
         }
     }
 
-    /**
-     * Lança {@link TooManyRequestsException} se a chave já tiver {@code limit} eventos ou mais dentro de
-     * {@code window}. Não registra nada: quem chama decide o que conta como tentativa.
-     */
     public void requireBelow(String key, int limit, Duration window) {
         Deque<Instant> deque = events.get(key);
         if (deque == null) {
@@ -57,7 +46,7 @@ public class RateLimiter {
         Instant now = clock.instant();
         synchronized (deque) {
             while (!deque.isEmpty() && !deque.peekFirst().isAfter(now.minus(window))) {
-                deque.removeFirst(); // saiu da janela
+                deque.removeFirst();
             }
             if (deque.size() >= limit) {
                 long retryAfter = Duration.between(now, deque.peekFirst().plus(window)).toSeconds() + 1;
@@ -66,12 +55,10 @@ public class RateLimiter {
         }
     }
 
-    /** Esquece os eventos da chave (ex.: login bem-sucedido zera as falhas daquele e-mail). */
     public void clear(String key) {
         events.remove(key);
     }
 
-    /** Usado pelos testes para começar do zero. */
     public void clearAll() {
         events.clear();
     }

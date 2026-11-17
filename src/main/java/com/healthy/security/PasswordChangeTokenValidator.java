@@ -12,13 +12,8 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * Regra extra de validação do JWT, além de assinatura, validade e emissor:
- * - o usuário do token ainda precisa existir;
- * - a versão gravada no token precisa ser a versão ATUAL do usuário.
- *
- * Trocar a senha soma 1 à versão do usuário, e assim todos os tokens emitidos antes deixam de valer.
- * Sem isto, um JWT roubado continuaria funcionando por horas mesmo depois de a vítima trocar a senha.
- * Custo: uma consulta simples ao banco por requisição.
+ * Rejects tokens whose version differs from the user's current one. Changing or resetting the password
+ * bumps the version, so a stolen JWT stops working. Costs one lookup per request.
  */
 @Component
 public class PasswordChangeTokenValidator implements OAuth2TokenValidator<Jwt> {
@@ -44,7 +39,6 @@ public class PasswordChangeTokenValidator implements OAuth2TokenValidator<Jwt> {
             return OAuth2TokenValidatorResult.failure(INVALID_SESSION);
         }
 
-        // Token sem o claim (emitido antes desta regra existir) conta como versão 0
         Number claim = jwt.getClaim(JwtService.TOKEN_VERSION_CLAIM);
         int tokenVersion = claim == null ? 0 : claim.intValue();
 

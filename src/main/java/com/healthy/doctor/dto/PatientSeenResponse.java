@@ -5,7 +5,6 @@ import com.healthy.appointment.Appointment;
 
 import java.time.LocalDate;
 
-/** Um paciente do médico, com os dados do último atendimento (espelha PacienteAtendido do Angular). */
 public record PatientSeenResponse(
         Long id,
         @JsonProperty("nome") String name,

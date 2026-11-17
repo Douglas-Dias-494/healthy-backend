@@ -6,7 +6,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 
-/** Relógio de teste que só anda quando o teste manda: permite simular "passaram 20 minutos" sem esperar. */
 public class MutableClock extends Clock {
 
     private Instant now;

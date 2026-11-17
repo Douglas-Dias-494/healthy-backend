@@ -22,9 +22,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Dados de partida (DadosIniciais): Maria tem 3 consultas e 2 receitas; José tem 1 consulta e nenhuma receita.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -37,8 +34,6 @@ class PatientAreaControllerTest {
 
     @Autowired
     private MockMvc mvc;
-
-    // ---------- Leitura ----------
 
     @Test
     void listsAppointmentsOfTheLoggedPatientNewestFirst() throws Exception {
@@ -77,13 +72,10 @@ class PatientAreaControllerTest {
                 .andExpect(jsonPath("$[0].observacoes", not(emptyString())));
     }
 
-    // ---------- Ativar acompanhamento ----------
-
     @Test
     void startsTrackingAndTakesTheDosageFromThePrescription() throws Exception {
         long prescriptionId = firstPrescriptionId(MARIA);
 
-        // o cliente "forja" a dosagem; o servidor ignora e usa a da receita
         startTracking(MARIA, prescriptionId, "Dipirona", 20, "2026-11-16", "999 mg")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
@@ -130,8 +122,6 @@ class PatientAreaControllerTest {
                 .andExpect(jsonPath("$.erros.quantity").exists());
     }
 
-    // ---------- Registrar dose ----------
-
     @Test
     void registeringDosesDecrementsAndStopsAtZero() throws Exception {
         long id = startTrackingAndGetId(MARIA, "Dipirona", 2);
@@ -148,8 +138,6 @@ class PatientAreaControllerTest {
         patchDose(JOSE, mariasTracking).andExpect(status().isNotFound());
         getAs(MARIA, "/acompanhamentos").andExpect(jsonPath("$[0].quantidadeRestante").value(5));
     }
-
-    // ---------- Encerrar ----------
 
     @Test
     void endingATrackingRemovesIt() throws Exception {
@@ -178,8 +166,6 @@ class PatientAreaControllerTest {
         mvc.perform(post(BASE + "/acompanhamentos").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
     }
-
-    // ---------- Auxiliares ----------
 
     private String bearer(String email) throws Exception {
         return TestAuth.bearer(mvc, "PACIENTE", email);

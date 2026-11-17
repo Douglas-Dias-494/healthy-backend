@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
-/** Ficha clínica do paciente logado: dados pessoais que ele mesmo preenche e consulta. */
 @Service
 public class PatientProfileService {
 
@@ -34,13 +33,12 @@ public class PatientProfileService {
                 .orElseGet(() -> new PatientProfileResponse(user.getNome(), user.getEmail(), null, null, null));
     }
 
-    /** Cria a ficha na primeira vez e atualiza nas seguintes. O nome também é atualizado na conta. */
     @Transactional
     public PatientProfileResponse updateProfile(Long userId, UpdatePatientProfileRequest request) {
         if (request.birthDate().isBefore(EARLIEST_BIRTH_DATE)) {
             throw new BusinessRuleException("Data de nascimento inválida.");
         }
-        // O CPF é único no sistema. O próprio paciente pode reenviar o seu sem conflito.
+
         if (patients.existsByCpfAndUsuarioIdNot(request.cpf(), userId)) {
             throw new ConflictException("Este CPF já está cadastrado em outra conta.");
         }
@@ -60,7 +58,6 @@ public class PatientProfileService {
         try {
             return toResponse(user, patients.saveAndFlush(patient));
         } catch (DataIntegrityViolationException e) {
-            // Duas contas enviando o mesmo CPF ao mesmo tempo: a restrição UNIQUE do banco decide
             throw new ConflictException("Este CPF já está cadastrado em outra conta.");
         }
     }

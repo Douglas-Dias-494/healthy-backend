@@ -26,19 +26,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Testes de integração: sobem a aplicação inteira (com o Spring Security ligado) e chamam a API como o
- * Angular chamaria. @Transactional desfaz no fim de cada teste o que ele gravou no banco.
- * Os usuários de teste (paciente@healthy.com, medico@healthy.com, senha 123456) vêm do DadosIniciais.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
 class AuthControllerTest {
 
-    private static final String PASSWORD = "123456"; // senha dos usuários de teste (DadosIniciais)
-    private static final String STRONG_PASSWORD = "Segredo2026"; // cumpre a política de senha (cadastros novos)
+    private static final String PASSWORD = "123456";
+    private static final String STRONG_PASSWORD = "Segredo2026";
 
     @Autowired
     private MockMvc mvc;
@@ -51,10 +46,8 @@ class AuthControllerTest {
 
     @BeforeEach
     void resetRateLimiter() {
-        limiter.clearAll(); // o limitador vive na memória e é compartilhado entre os testes
+        limiter.clearAll();
     }
-
-    // ---------- Login ----------
 
     @Test
     void validLoginReturnsTokenAndUserData() throws Exception {
@@ -73,7 +66,6 @@ class AuthControllerTest {
 
     @Test
     void loginWorksEvenWithExpiredOrInvalidTokenInHeader() throws Exception {
-        // Cenário real: o navegador ainda guarda um token antigo e o envia junto ao tentar entrar de novo.
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer token.velho.invalido")
                         .content("{\"perfil\":\"PACIENTE\",\"email\":\"paciente@healthy.com\",\"senha\":\"123456\"}"))
@@ -110,7 +102,6 @@ class AuthControllerTest {
 
     @Test
     void wrongProfileReturns401() throws Exception {
-        // medico@healthy.com existe, mas como MEDICO. Tentar entrar como PACIENTE é recusado.
         login("PACIENTE", "medico@healthy.com", PASSWORD).andExpect(status().isUnauthorized());
     }
 
@@ -123,18 +114,15 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.erros.senha").exists());
     }
 
-    // ---------- Cadastro ----------
-
     @Test
     void patientSignUpCreatesAccountWithHashedPassword() throws Exception {
         signUp("PACIENTE", "Ana Paula", "ana.paula@teste.com", STRONG_PASSWORD, null, null)
                 .andExpect(status().isCreated());
 
         Usuario created = users.findByEmail("ana.paula@teste.com").orElseThrow();
-        assertThat(created.getSenhaHash()).isNotEqualTo(STRONG_PASSWORD).startsWith("$2"); // $2a$... = BCrypt
+        assertThat(created.getSenhaHash()).isNotEqualTo(STRONG_PASSWORD).startsWith("$2");
         assertThat(created.getCrm()).isNull();
 
-        // e a conta nova já consegue entrar
         login("PACIENTE", "ana.paula@teste.com", STRONG_PASSWORD).andExpect(status().isOk());
     }
 
@@ -169,8 +157,6 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.erros.senha").exists());
     }
 
-    // ---------- Proteção dos endpoints ----------
-
     @Test
     void meWithoutTokenReturns401() throws Exception {
         mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
@@ -189,7 +175,7 @@ class AuthControllerTest {
     void tamperedTokenReturns401() throws Exception {
         String[] parts = token("PACIENTE", "paciente@healthy.com").split("\\.");
         char[] signature = parts[2].toCharArray();
-        signature[5] = signature[5] == 'A' ? 'B' : 'A'; // estraga a assinatura
+        signature[5] = signature[5] == 'A' ? 'B' : 'A';
         String tampered = parts[0] + "." + parts[1] + "." + new String(signature);
 
         mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + tampered))
@@ -210,11 +196,8 @@ class AuthControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    // ---------- CORS ----------
-
     @Test
     void corsAllowsAngularDevOrigin() throws Exception {
-        // "preflight": a pergunta que o navegador faz antes do POST de verdade
         mvc.perform(options("/api/auth/login")
                         .header(HttpHeaders.ORIGIN, "http://localhost:4200")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
@@ -230,8 +213,6 @@ class AuthControllerTest {
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
                 .andExpect(status().isForbidden());
     }
-
-    // ---------- Auxiliares ----------
 
     private ResultActions login(String profile, String email, String password) throws Exception {
         String json = """

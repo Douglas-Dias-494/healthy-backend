@@ -8,11 +8,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 
-/**
- * Link de recuperação de senha. Guarda só o HASH (SHA-256) do token: o valor que vai por e-mail não fica
- * no banco, então um vazamento da tabela não permite redefinir a senha de ninguém.
- * Uso único: é apagado quando a senha é redefinida.
- */
+/** Stores only the SHA-256 hash of the e-mailed token: a database leak cannot be used to reset passwords. */
 @Entity
 @Table(name = "password_reset_tokens")
 @Getter

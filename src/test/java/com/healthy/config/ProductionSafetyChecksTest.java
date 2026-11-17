@@ -10,7 +10,6 @@ class ProductionSafetyChecksTest {
 
     private static final String REAL_SECRET = "Zx9Qw7Lm3Vb5Nc1Hd8Ks2Jf6Tg4Yr0PoUiAeSdFgHjKlMn";
 
-    /** Uma configuração de produção completa e segura; cada teste estraga uma coisa. */
     private static MockEnvironment safeEnvironment() {
         return new MockEnvironment()
                 .withProperty("healthy.jwt.secret", REAL_SECRET)
@@ -65,7 +64,6 @@ class ProductionSafetyChecksTest {
 
     @Test
     void refusesPlaceholdersThatWereNeverResolved() {
-        // O que acontece quando a variável de ambiente não existe: o texto "${...}" fica literal
         MockEnvironment environment = safeEnvironment().withProperty("healthy.cors.allowed-origins", "${HEALTHY_CORS_ORIGINS}");
 
         assertThatThrownBy(() -> verify(environment))

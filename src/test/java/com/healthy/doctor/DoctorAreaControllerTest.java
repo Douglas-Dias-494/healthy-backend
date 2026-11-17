@@ -25,9 +25,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Dados de partida (DadosIniciais): Dr. João atendeu Paula, José e Maria; Dra. Ana atendeu só a Maria.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -55,15 +52,12 @@ class DoctorAreaControllerTest {
         limiter.clearAll();
     }
 
-    // ---------- Buscar paciente e registrar atendimento ----------
-
     @Test
     void findsAPatientByExactEmailIgnoringCaseAndSpaces() throws Exception {
         lookup(JOAO, "  PACIENTE@Healthy.com ")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.nome").value("Maria"))
-                // o médico recebe o mínimo: nada de e-mail, CPF ou telefone
                 .andExpect(jsonPath("$.email").doesNotExist())
                 .andExpect(jsonPath("$.cpf").doesNotExist());
     }
@@ -73,7 +67,6 @@ class DoctorAreaControllerTest {
         lookup(JOAO, "ninguem@exemplo.com")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Nenhum paciente encontrado com este e-mail."));
-        // procurar o e-mail de outro MÉDICO não pode revelar que a conta existe
         lookup(JOAO, ANA)
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Nenhum paciente encontrado com este e-mail."));
@@ -89,21 +82,17 @@ class DoctorAreaControllerTest {
 
     @Test
     void registeringAnAppointmentAssociatesDoctorAndPatientEndToEnd() throws Exception {
-        // 1) uma paciente nova se cadastra (ainda sem nenhum médico)
         mvc.perform(post("/api/auth/cadastro").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"perfil\":\"PACIENTE\",\"nome\":\"Lúcia Nova\",\"email\":\"lucia.nova@exemplo.com\",\"senha\":\"Segredo2026\"}"))
                 .andExpect(status().isCreated());
         long luciaId = ((Number) com.jayway.jsonpath.JsonPath.read(
                 lookup(JOAO, "lucia.nova@exemplo.com").andReturn().getResponse().getContentAsString(), "$.id")).longValue();
 
-        // 2) sem consulta registrada, o médico não pode emitir receita para ela
         issuePrescription(JOAO, validBodyFor(luciaId)).andExpect(status().isForbidden());
 
-        // 3) o médico registra o atendimento
         registerAppointment(JOAO, luciaId, "2026-11-01", "Clínica Vida — São Paulo, SP", "Primeira consulta")
                 .andExpect(status().isCreated());
 
-        // 4) agora ela vê o médico, o médico vê a paciente, e a receita passa a ser permitida
         mvc.perform(get("/api/pacientes/me/atendimentos")
                         .header(HttpHeaders.AUTHORIZATION, loginAs("PACIENTE", "lucia.nova@exemplo.com", "Segredo2026")))
                 .andExpect(jsonPath("$.length()").value(1))
@@ -134,7 +123,7 @@ class DoctorAreaControllerTest {
     @Test
     void anUnknownPatientOrADoctorIdIsRefusedWith404() throws Exception {
         registerAppointment(JOAO, 9999, "2026-11-01", "Clínica Vida", "Retorno").andExpect(status().isNotFound());
-        registerAppointment(JOAO, 3, "2026-11-01", "Clínica Vida", "Retorno") // id 3 = Dra. Ana, não é paciente
+        registerAppointment(JOAO, 3, "2026-11-01", "Clínica Vida", "Retorno")
                 .andExpect(status().isNotFound());
     }
 
@@ -155,8 +144,6 @@ class DoctorAreaControllerTest {
                         .content("{\"email\":\"jose.almeida@healthy.com\"}"))
                 .andExpect(status().isForbidden());
     }
-
-    // ---------- Pacientes ----------
 
     @Test
     void listsTheDoctorsPatientsNewestAppointmentFirst() throws Exception {
@@ -195,8 +182,6 @@ class DoctorAreaControllerTest {
                 .andExpect(jsonPath("$[0].dataAtendimento").value("2026-09-05"));
     }
 
-    // ---------- Emitir receita ----------
-
     @Test
     void issuedPrescriptionShowsUpForThePatient() throws Exception {
         issuePrescription(JOAO, """
@@ -210,7 +195,6 @@ class DoctorAreaControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(mvc, "PACIENTE", "paciente@healthy.com")))
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[?(@.medicamentos[0].nome == 'Ibuprofeno')].medico.nome").value(hasItem("Dr. João")))
-                // a data é a de hoje, definida pelo servidor
                 .andExpect(jsonPath("$[?(@.medicamentos[0].nome == 'Ibuprofeno')].data")
                         .value(hasItem(LocalDate.now().toString())))
                 .andExpect(jsonPath("$[?(@.medicamentos[0].nome == 'Ibuprofeno')].medicamentos.length()")
@@ -219,7 +203,6 @@ class DoctorAreaControllerTest {
 
     @Test
     void cannotIssueForAPatientTheDoctorNeverSaw() throws Exception {
-        // Dra. Ana só atendeu a Maria (id 1); José (id 5) não é paciente dela
         issuePrescription(ANA, validBodyFor(5))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.detail").value("Este paciente não está associado a você."));
@@ -252,8 +235,6 @@ class DoctorAreaControllerTest {
     void endpointsRequireAuthentication() throws Exception {
         mvc.perform(get(BASE + "/pacientes")).andExpect(status().isUnauthorized());
     }
-
-    // ---------- Auxiliares ----------
 
     private String bearer(String email) throws Exception {
         return TestAuth.bearer(mvc, "MEDICO", email);

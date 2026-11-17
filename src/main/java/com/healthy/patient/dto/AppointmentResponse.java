@@ -5,7 +5,6 @@ import com.healthy.appointment.Appointment;
 
 import java.time.LocalDate;
 
-/** Espelha Atendimento do Angular. */
 public record AppointmentResponse(
         Long id,
         @JsonProperty("medico") DoctorSummaryResponse doctor,

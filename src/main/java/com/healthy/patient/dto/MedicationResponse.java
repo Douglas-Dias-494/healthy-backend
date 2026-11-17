@@ -3,7 +3,6 @@ package com.healthy.patient.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.healthy.prescription.PrescribedMedication;
 
-/** Espelha Medicamento do Angular. */
 public record MedicationResponse(
         @JsonProperty("nome") String name,
         @JsonProperty("dosagem") String dosage,

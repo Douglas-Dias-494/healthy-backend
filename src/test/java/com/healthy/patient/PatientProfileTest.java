@@ -21,7 +21,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Ficha do paciente (CPF, nascimento, telefone). CPFs válidos de teste: 52998224725 e 11144477735. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -58,7 +57,6 @@ class PatientProfileTest {
 
         getProfile(MARIA).andExpect(jsonPath("$.cpf").value(CPF)).andExpect(jsonPath("$.nome").value("Maria Silva"));
 
-        // o nome novo vale para a conta toda (aparece em /me e nas listas do médico)
         mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(mvc, "PACIENTE", MARIA)))
                 .andExpect(jsonPath("$.nome").value("Maria Silva"));
     }
@@ -113,7 +111,6 @@ class PatientProfileTest {
     void theCpfNeverShowsUpForDoctors() throws Exception {
         putProfile(MARIA, body("Maria", CPF, "1990-05-17", null)).andExpect(status().isOk());
 
-        // O médico vê a Maria na lista de pacientes dele, mas sem dado nenhum da ficha
         mvc.perform(get("/api/medicos/me/pacientes")
                         .header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(mvc, "MEDICO", "medico@healthy.com")))
                 .andExpect(status().isOk())
@@ -130,8 +127,6 @@ class PatientProfileTest {
     void theProfileRequiresAuthentication() throws Exception {
         mvc.perform(get(URL)).andExpect(status().isUnauthorized());
     }
-
-    // ---------- Auxiliares ----------
 
     private ResultActions getProfile(String email) throws Exception {
         return mvc.perform(get(URL)

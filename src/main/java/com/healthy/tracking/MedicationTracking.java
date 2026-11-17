@@ -9,11 +9,9 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 
-/** Acompanhamento de um remédio que o paciente ativou: data de início e quantas unidades restam. */
 @Entity
 @Table(
         name = "medication_trackings",
-        // O banco garante que o mesmo remédio da mesma receita não seja acompanhado duas vezes
         uniqueConstraints = @UniqueConstraint(columnNames = {"patient_id", "prescription_id", "medication_name"}))
 @Getter
 @Setter
@@ -47,15 +45,10 @@ public class MedicationTracking {
     @Column(name = "remaining_quantity", nullable = false)
     private int remainingQuantity;
 
-    /**
-     * Controle de concorrência otimista: o Hibernate soma 1 a cada alteração e, ao gravar, confere se
-     * ninguém mudou o registro no meio. Dois "tomei 1" simultâneos não se perdem: o segundo falha (409)
-     * em vez de sobrescrever o primeiro.
-     */
+    // Optimistic locking: two simultaneous doses cannot overwrite each other (the second one gets a 409).
     @Version
     private Long version;
 
-    /** Desconta uma unidade. Nunca fica abaixo de zero. */
     public void takeDose() {
         if (remainingQuantity > 0) {
             remainingQuantity--;

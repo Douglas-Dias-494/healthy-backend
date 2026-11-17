@@ -22,7 +22,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Proteções da conta: bloqueio de força bruta, política de senha, troca de senha e cabeçalhos HTTP. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -44,8 +43,6 @@ class AccountSecurityTest {
         limiter.clearAll();
     }
 
-    // ---------- Força bruta no login ----------
-
     @Test
     void fifthWrongPasswordLocksTheAccountEvenForTheCorrectPassword() throws Exception {
         for (int i = 0; i < 5; i++) {
@@ -65,7 +62,6 @@ class AccountSecurityTest {
         }
         login("PACIENTE", PATIENT, PASSWORD).andExpect(status().isOk());
 
-        // a contagem recomeçou: mais 4 erros ainda não bloqueiam
         for (int i = 0; i < 4; i++) {
             login("PACIENTE", PATIENT, "errada").andExpect(status().isUnauthorized());
         }
@@ -81,8 +77,6 @@ class AccountSecurityTest {
 
     @Test
     void manyFailuresFromOneIpBlockEvenOtherAccounts() throws Exception {
-        // Atacante testando e-mails diferentes, um erro em cada: o bloqueio por e-mail nunca dispara,
-        // mas o bloqueio por IP sim.
         for (int i = 0; i < 20; i++) {
             login("PACIENTE", "alvo" + i + "@exemplo.com", "tentativa1").andExpect(status().isUnauthorized());
         }
@@ -97,8 +91,6 @@ class AccountSecurityTest {
         signUp("lote11@exemplo.com", "Segredo2026").andExpect(status().isTooManyRequests());
     }
 
-    // ---------- Política de senha ----------
-
     @Test
     void weakPasswordsAreRefusedOnSignUp() throws Exception {
         for (String weak : new String[] {"curta1", "somenteletras", "1234567890", "Password1", "senha123"}) {
@@ -107,8 +99,6 @@ class AccountSecurityTest {
                     .andExpect(jsonPath("$.erros.senha").exists());
         }
     }
-
-    // ---------- Troca de senha (usuário logado) ----------
 
     @Test
     void changingThePasswordEndsOldSessionsAndReturnsANewToken() throws Exception {
@@ -120,11 +110,9 @@ class AccountSecurityTest {
                 .andReturn().getResponse().getContentAsString();
         String newBearer = "Bearer " + JsonPath.<String>read(response, "$.token");
 
-        // o token antigo morreu; o novo funciona
         mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, oldBearer)).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, newBearer)).andExpect(status().isOk());
 
-        // e a senha antiga deixou de entrar
         login("PACIENTE", PATIENT, PASSWORD).andExpect(status().isUnauthorized());
         login("PACIENTE", PATIENT, NEW_PASSWORD).andExpect(status().isOk());
     }
@@ -136,7 +124,6 @@ class AccountSecurityTest {
         changePassword(bearer, "nao-e-essa1", NEW_PASSWORD)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("A senha atual está incorreta."));
-        // nada mudou: a senha antiga continua valendo
         login("PACIENTE", PATIENT, PASSWORD).andExpect(status().isOk());
     }
 
@@ -174,8 +161,6 @@ class AccountSecurityTest {
         changePassword(bearer, PASSWORD, NEW_PASSWORD).andExpect(status().isTooManyRequests());
     }
 
-    // ---------- Cabeçalhos de segurança ----------
-
     @Test
     void responsesCarrySecurityHeaders() throws Exception {
         mvc.perform(get("/api/auth/me"))
@@ -192,8 +177,6 @@ class AccountSecurityTest {
         mvc.perform(get("/api/auth/me").secure(true))
                 .andExpect(header().string("Strict-Transport-Security", containsString("max-age=31536000")));
     }
-
-    // ---------- Auxiliares ----------
 
     private ResultActions login(String profile, String email, String password) throws Exception {
         String json = """

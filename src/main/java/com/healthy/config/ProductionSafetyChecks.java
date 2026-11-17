@@ -7,15 +7,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Trava de segurança: em produção a aplicação se recusa a subir com configuração perigosa ou incompleta.
- * Melhor falhar na partida, com uma mensagem clara, do que rodar exposta sem ninguém perceber.
- */
+/** Production refuses to start with missing or unsafe configuration: failing at boot beats running exposed. */
 @Component
 @Profile("prod")
 public class ProductionSafetyChecks {
 
-    /** Propriedades que em produção precisam vir de variáveis de ambiente (ver application-prod.properties). */
     private static final List<String> REQUIRED = List.of(
             "healthy.jwt.secret",
             "healthy.cors.allowed-origins",
@@ -48,10 +44,7 @@ public class ProductionSafetyChecks {
         }
     }
 
-    /**
-     * Ausente = não definida, vazia, ou um "${VARIAVEL}" que ficou sem resolver. O Spring deixa esse texto
-     * literal em alguns casos, e ele passaria como se fosse um valor de verdade.
-     */
+    /** Spring may leave an unresolved "${VAR}" as literal text, which would otherwise pass as a real value. */
     private boolean isMissing(String property) {
         try {
             String value = environment.getProperty(property);

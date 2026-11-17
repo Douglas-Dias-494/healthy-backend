@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * SÓ PARA DESENVOLVIMENTO E TESTES: sem servidor de e-mail, o link aparece no console da API.
- * Em produção esta classe nem é carregada (um link no log seria uma falha grave de segurança).
+ * DEV/TEST only: prints the reset link to the console. Never loaded in production,
+ * where a link in the logs would be a security flaw.
  */
 @Component
 @Profile({"dev", "test"})

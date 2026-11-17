@@ -20,7 +20,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # Sobe a aplicação com banco em memória, aplica as migrações e roda todos os testes
+      # Starts the app on an in-memory database, applies the migrations and runs every test
       - name: Build and test
         run: |
           chmod +x mvnw

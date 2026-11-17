@@ -9,10 +9,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Política de senha: 8 a 72 caracteres, ao menos uma letra e um número, e fora da lista de senhas comuns.
- * (72 é o limite de bytes do BCrypt. Passar disso faria o final da senha ser ignorado.)
- */
+/** Password policy: 8-72 characters (72 is BCrypt's byte limit), a letter and a digit, not a common password. */
 @Documented
 @Constraint(validatedBy = StrongPasswordValidator.class)
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.ANNOTATION_TYPE, ElementType.TYPE_USE})

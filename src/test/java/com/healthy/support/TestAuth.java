@@ -7,7 +7,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Auxiliar dos testes de integração: faz login de verdade e devolve o cabeçalho "Bearer ...". */
 public final class TestAuth {
 
     public static final String PASSWORD = "123456";

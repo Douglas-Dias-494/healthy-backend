@@ -22,11 +22,6 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Traduz exceções em respostas HTTP padronizadas (ProblemDetail, formato RFC 9457):
- * { "status": 409, "detail": "Já existe uma conta com este e-mail.", ... }
- * O frontend lê o "detail" para mostrar a mensagem ao usuário.
- */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -50,7 +45,6 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
-    /** 429: o cabeçalho Retry-After diz em quantos segundos tentar de novo. */
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<ProblemDetail> tooManyRequests(TooManyRequestsException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -68,14 +62,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    /** Duas alterações simultâneas no mesmo registro (ver @Version em MedicationTracking). */
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ProblemDetail concurrentModification(ObjectOptimisticLockingFailureException ex) {
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT, "O registro foi alterado por outra operação. Tente novamente.");
     }
 
-    /** Falha do @Valid: devolve 400 com a mensagem de cada campo em "erros". */
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {

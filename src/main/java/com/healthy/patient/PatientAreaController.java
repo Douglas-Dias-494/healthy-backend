@@ -23,10 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Área do paciente logado. "/me" = o paciente é identificado pelo token, não por um id na URL.
- * O SecurityConfig só deixa entrar quem tem o perfil PACIENTE (médicos recebem 403).
- */
 @RestController
 @RequestMapping("/api/pacientes/me")
 public class PatientAreaController {
@@ -39,13 +35,11 @@ public class PatientAreaController {
         this.profileService = profileService;
     }
 
-    /** A ficha do paciente (nome, e-mail, CPF, nascimento, telefone). CPF etc. vêm null até ele preencher. */
     @GetMapping("/ficha")
     public PatientProfileResponse getProfile(@AuthenticationPrincipal Jwt jwt) {
         return profileService.getProfile(patientId(jwt));
     }
 
-    /** Cria ou atualiza a ficha. 200 | 400 dados inválidos (CPF inválido...) | 409 CPF de outra conta. */
     @PutMapping("/ficha")
     public PatientProfileResponse updateProfile(
             @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdatePatientProfileRequest request) {
@@ -67,7 +61,6 @@ public class PatientAreaController {
         return service.listTrackings(patientId(jwt));
     }
 
-    /** 201 com o acompanhamento criado | 400 inválido | 404 receita não é do paciente | 409 já existe. */
     @PostMapping("/acompanhamentos")
     @ResponseStatus(HttpStatus.CREATED)
     public TrackingResponse startTracking(
@@ -75,7 +68,6 @@ public class PatientAreaController {
         return service.startTracking(patientId(jwt), request);
     }
 
-    /** "Tomei 1": desconta uma unidade (mínimo 0). 404 se o acompanhamento não for do paciente. */
     @PatchMapping("/acompanhamentos/{id}/dose")
     public TrackingResponse registerDose(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         return service.registerDose(patientId(jwt), id);
@@ -87,7 +79,6 @@ public class PatientAreaController {
         service.endTracking(patientId(jwt), id);
     }
 
-    /** O "sub" do token é o id do usuário (ver JwtService). */
     private static Long patientId(Jwt jwt) {
         return Long.valueOf(jwt.getSubject());
     }

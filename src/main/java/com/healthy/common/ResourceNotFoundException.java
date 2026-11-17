@@ -1,9 +1,6 @@
 package com.healthy.common;
 
-/**
- * Recurso inexistente OU que pertence a outra pessoa. Os dois casos respondem 404 de propósito:
- * dizer "isso existe, mas não é seu" (403) revelaria que o id é válido.
- */
+/** Missing OR not owned by the caller. Both answer 404: a 403 would reveal that the id exists. */
 public class ResourceNotFoundException extends RuntimeException {
 
     public ResourceNotFoundException(String message) {

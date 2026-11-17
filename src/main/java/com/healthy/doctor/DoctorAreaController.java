@@ -19,10 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Área do médico logado ("/me": identificado pelo token). O SecurityConfig só deixa entrar quem tem o
- * perfil MEDICO (pacientes recebem 403).
- */
 @RestController
 @RequestMapping("/api/medicos/me")
 public class DoctorAreaController {
@@ -38,21 +34,18 @@ public class DoctorAreaController {
         return service.listPatients(doctorId(jwt));
     }
 
-    /** Busca um paciente pelo e-mail exato. 200 {id, nome} | 404 não encontrado | 429 buscas demais. */
     @PostMapping("/pacientes/busca")
     public PatientLookupResponse findPatientByEmail(
             @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PatientLookupRequest request, HttpServletRequest http) {
         return service.findPatientByEmail(doctorId(jwt), request.email(), http.getRemoteAddr());
     }
 
-    /** Registra um atendimento (associa médico e paciente). 201 | 400 | 404 paciente | 409 duplicado. */
     @PostMapping("/atendimentos")
     @ResponseStatus(HttpStatus.CREATED)
     public void registerAppointment(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NewAppointmentRequest request) {
         service.registerAppointment(doctorId(jwt), request);
     }
 
-    /** 201 sem corpo | 400 dados inválidos | 403 paciente não é do médico. */
     @PostMapping("/receitas")
     @ResponseStatus(HttpStatus.CREATED)
     public void issuePrescription(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody NewPrescriptionRequest request) {

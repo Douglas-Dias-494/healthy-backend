@@ -15,13 +15,13 @@ class StrongPasswordValidatorTest {
     @Test
     void acceptsLongPasswordsWithLettersAndDigits() {
         assertThat(valid("Segredo2026")).isTrue();
-        assertThat(valid("abcdefg1")).isTrue(); // exatamente 8
-        assertThat(valid("Café-com-leite-123")).isTrue(); // acentos e símbolos
+        assertThat(valid("abcdefg1")).isTrue();
+        assertThat(valid("Café-com-leite-123")).isTrue();
     }
 
     @Test
     void rejectsShortPasswords() {
-        assertThat(valid("Abc1234")).isFalse(); // 7
+        assertThat(valid("Abc1234")).isFalse();
     }
 
     @Test
@@ -39,8 +39,8 @@ class StrongPasswordValidatorTest {
 
     @Test
     void rejectsPasswordsOverBcryptLimit() {
-        assertThat(valid("a1" + "x".repeat(70))).isTrue(); // 72 bytes
-        assertThat(valid("a1" + "x".repeat(71))).isFalse(); // 73 bytes: o BCrypt ignoraria o final
+        assertThat(valid("a1" + "x".repeat(70))).isTrue();
+        assertThat(valid("a1" + "x".repeat(71))).isFalse();
     }
 
     @Test

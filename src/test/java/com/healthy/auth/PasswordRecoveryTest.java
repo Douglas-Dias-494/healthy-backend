@@ -31,10 +31,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Recuperação de senha. O envio do e-mail é substituído por um "dublê" (@MockitoBean): assim o teste captura
- * o link que iria por e-mail e o usa, exatamente como o usuário faria.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -72,7 +68,6 @@ class PasswordRecoveryTest {
 
     @Test
     void anUnknownAccountGetsTheSameResponseAndNoEmail() throws Exception {
-        // Se a resposta fosse diferente, qualquer pessoa descobriria quem tem conta no sistema
         forgotPassword("ninguem@exemplo.com").andExpect(status().isAccepted());
         verifyNoInteractions(notifier);
     }
@@ -84,7 +79,7 @@ class PasswordRecoveryTest {
         List<PasswordResetToken> stored = tokens.findAll();
         assertThat(stored).hasSize(1);
         assertThat(stored.get(0).getTokenHash())
-                .hasSize(64) // SHA-256 em hexadecimal
+                .hasSize(64)
                 .isNotEqualTo(rawToken)
                 .doesNotContain(rawToken);
     }
@@ -121,7 +116,7 @@ class PasswordRecoveryTest {
         resetPassword(rawToken, NEW_PASSWORD)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Link inválido ou expirado. Solicite um novo."));
-        login(PATIENT, "123456").andExpect(status().isOk()); // a senha não mudou
+        login(PATIENT, "123456").andExpect(status().isOk());
     }
 
     @Test
@@ -137,7 +132,7 @@ class PasswordRecoveryTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erros.newPassword").exists());
 
-        resetPassword(rawToken, NEW_PASSWORD).andExpect(status().isNoContent()); // o link ainda servia
+        resetPassword(rawToken, NEW_PASSWORD).andExpect(status().isNoContent());
     }
 
     @Test
@@ -169,8 +164,6 @@ class PasswordRecoveryTest {
         }
         resetPassword("chute-final", NEW_PASSWORD).andExpect(status().isTooManyRequests());
     }
-
-    // ---------- Auxiliares ----------
 
     private String requestToken(String email) throws Exception {
         forgotPassword(email).andExpect(status().isAccepted());

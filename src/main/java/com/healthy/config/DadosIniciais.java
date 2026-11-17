@@ -17,10 +17,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Cria usuários, consultas e receitas de teste quando o banco está vazio. SÓ PARA DESENVOLVIMENTO
- * (desligue com healthy.seed=false). Todos os usuários usam a senha "123456".
- */
+/** Development-only seed data (healthy.seed=true). Every seeded user has the password 123456. */
 @Component
 @ConditionalOnProperty(name = "healthy.seed", havingValue = "true")
 public class DadosIniciais implements ApplicationRunner {
@@ -58,7 +55,7 @@ public class DadosIniciais implements ApplicationRunner {
 
     private void seedUsers() {
         if (users.count() > 0) {
-            return; // já tem gente: não duplica
+            return;
         }
 
         createUser(Perfil.PACIENTE, "Maria", PATIENT_MARIA, null, null);
@@ -74,7 +71,6 @@ public class DadosIniciais implements ApplicationRunner {
             return;
         }
 
-        // Se alguém apagou os usuários de teste, não há como ligar as consultas a eles
         if (users.findByEmail(PATIENT_MARIA).isEmpty() || users.findByEmail(DOCTOR_JOAO).isEmpty()) {
             return;
         }

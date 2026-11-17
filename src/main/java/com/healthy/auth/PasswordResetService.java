@@ -24,9 +24,8 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 /**
- * Recuperação de senha em dois passos:
- * 1) {@link #requestReset}: gera um token aleatório, guarda só o hash dele e manda o link ao e-mail;
- * 2) {@link #resetPassword}: quem tem o link escolhe a nova senha. O token vale uma vez e por pouco tempo.
+ * Password recovery by e-mailed link. The token is random (256 bits) and only its SHA-256 hash is stored,
+ * so a database leak cannot be used to reset anyone's password. Tokens are single-use and expire.
  */
 @Service
 public class PasswordResetService {
@@ -68,12 +67,10 @@ public class PasswordResetService {
         this.frontendUrl = frontendUrl.replaceAll("/+$", "");
     }
 
-    /**
-     * Quem chama recebe SEMPRE a mesma resposta, exista o e-mail ou não. Se a API dissesse "e-mail não
-     * encontrado", qualquer pessoa poderia descobrir quem tem conta no sistema (e isso em saúde é sensível).
-     */
     @Transactional
     public void requestReset(String rawEmail, String ip) {
+        // Callers always get the same answer, whether or not the e-mail exists, so this endpoint
+        // cannot be used to discover who has an account.
         String email = Emails.normalize(rawEmail);
         String ipKey = "forgot-ip:" + ip;
         String emailKey = "forgot-email:" + email;
@@ -84,10 +81,10 @@ public class PasswordResetService {
         attempts.record(emailKey);
         audit.passwordResetRequested(email, ip);
 
-        tokens.deleteExpired(clock.instant()); // limpeza oportunista dos links vencidos
+        tokens.deleteExpired(clock.instant());
 
         users.findByEmail(email).ifPresent(user -> {
-            tokens.deleteByUsuarioId(user.getId()); // só o link mais recente vale
+            tokens.deleteByUsuarioId(user.getId());
             String rawToken = newToken();
 
             PasswordResetToken token = new PasswordResetToken();
@@ -112,25 +109,22 @@ public class PasswordResetService {
         if (token == null || token.isExpired(now)) {
             attempts.record(ipKey);
             audit.passwordResetFailed(ip);
-            // Mesma mensagem para "nunca existiu", "já usado" e "vencido"
             throw new BusinessRuleException("Link inválido ou expirado. Solicite um novo.");
         }
 
         Usuario user = token.getUsuario();
         user.setSenhaHash(encoder.encode(request.newPassword()));
-        user.invalidateSessions(); // encerra qualquer sessão aberta com a senha antiga
-        tokens.deleteByUsuarioId(user.getId()); // uso único: este e quaisquer outros links deixam de valer
+        user.invalidateSessions();
+        tokens.deleteByUsuarioId(user.getId());
         audit.passwordResetCompleted(user.getId(), ip);
     }
 
-    /** 32 bytes aleatórios (256 bits) em texto seguro para URL. Impossível de adivinhar. */
     private static String newToken() {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /** SHA-256 em hexadecimal (64 caracteres). Como o token já é aleatório e longo, não precisa de BCrypt. */
     private static String hash(String rawToken) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(rawToken.getBytes(StandardCharsets.UTF_8));

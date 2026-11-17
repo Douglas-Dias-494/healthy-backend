@@ -19,11 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 
-/** Regras de negócio de cadastro, login e troca de senha. O controller só recebe e devolve; quem decide é esta classe. */
 @Service
 public class AuthService {
 
-    // Limites de tentativas (ver RateLimiter). Falhas de login contam por IP e por e-mail.
     private static final int LOGIN_FAILURES_PER_IP = 20;
     private static final int LOGIN_FAILURES_PER_EMAIL = 5;
     private static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);
@@ -37,7 +35,6 @@ public class AuthService {
     private final AttemptGuard attempts;
     private final SecurityAuditLogger audit;
 
-    // Hash de uma senha qualquer, usado só para "gastar o mesmo tempo" quando o e-mail não existe (ver login).
     private final String fakeHash;
 
     public AuthService(
@@ -60,21 +57,18 @@ public class AuthService {
         String ipKey = "login-ip:" + ip;
         String emailKey = "login-email:" + email;
 
-        // Antes de gastar tempo com BCrypt: quem já errou demais é barrado (429).
-        // Isso impede adivinhar senhas por força bruta, tanto contra uma conta quanto de um mesmo IP.
+        // Reject before spending time on BCrypt: brute force is capped per account and per IP (429).
         attempts.check("login", ipKey, LOGIN_FAILURES_PER_IP, LOGIN_WINDOW, ip);
         attempts.check("login", emailKey, LOGIN_FAILURES_PER_EMAIL, LOGIN_WINDOW, ip);
 
         Usuario user = users.findByEmail(email).orElse(null);
 
-        // O BCrypt é lento DE PROPÓSITO. Se só o e-mail existente demorasse, quem ataca mediria o tempo e
-        // descobriria quais e-mails têm conta. Comparando sempre (com um hash falso quando não existe),
-        // os dois casos demoram igual.
+        // BCrypt is slow on purpose. Always compare (against a fake hash when the e-mail is unknown)
+        // so the response time does not reveal which e-mails have an account.
         String hash = user != null ? user.getSenhaHash() : fakeHash;
         boolean passwordMatches = encoder.matches(request.senha(), hash);
 
-        // Uma única mensagem para e-mail inexistente, senha errada ou perfil errado:
-        // não revela qual dos três falhou.
+        // One generic error for unknown e-mail, wrong password or wrong profile.
         if (user == null || !passwordMatches || user.getPerfil() != request.perfil()) {
             attempts.record(ipKey);
             attempts.record(emailKey);
@@ -82,7 +76,7 @@ public class AuthService {
             throw new CredenciaisInvalidasException();
         }
 
-        attempts.clear(emailKey); // acertou: as falhas anteriores daquele e-mail deixam de contar
+        attempts.clear(emailKey);
         audit.loginSuccess(user.getId(), ip);
         return toLoginResponse(user);
     }
@@ -91,7 +85,7 @@ public class AuthService {
     public void signUp(CadastroRequest request, String ip) {
         String ipKey = "signup-ip:" + ip;
         attempts.check("sign-up", ipKey, SIGN_UPS_PER_IP, SIGN_UP_WINDOW, ip);
-        attempts.record(ipKey); // toda tentativa conta, dê certo ou não
+        attempts.record(ipKey);
 
         String email = Emails.normalize(request.email());
         if (users.existsByEmail(email)) {
@@ -104,7 +98,6 @@ public class AuthService {
         user.setEmail(email);
         user.setSenhaHash(encoder.encode(request.senha()));
 
-        // CRM e especialidade só fazem sentido para médico; para paciente são ignorados
         if (request.perfil() == Perfil.MEDICO) {
             user.setCrm(request.crm().trim());
             user.setEspecialidade(request.especialidade().trim());
@@ -113,8 +106,7 @@ public class AuthService {
         try {
             users.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
-            // Duas requisições com o mesmo e-mail ao mesmo tempo passam pelo existsByEmail.
-            // A restrição UNIQUE do banco é a garantia final.
+            // The UNIQUE constraint is the final guard against two simultaneous sign-ups with the same e-mail.
             throw new EmailJaCadastradoException();
         }
         audit.accountCreated(user.getId(), ip);
@@ -126,11 +118,6 @@ public class AuthService {
         return new UsuarioLogadoResponse(user.getId(), user.getNome(), user.getPerfil());
     }
 
-    /**
-     * Troca a senha de quem já está logado. Exige a senha ATUAL (quem pegou o celular desbloqueado de alguém
-     * não consegue trocá-la) e encerra as outras sessões: os tokens antigos deixam de valer.
-     * Devolve um token novo para a sessão atual continuar funcionando.
-     */
     @Transactional
     public LoginResponse changePassword(Long userId, ChangePasswordRequest request, String ip) {
         String key = "change-password:" + userId;
@@ -147,8 +134,9 @@ public class AuthService {
         }
 
         attempts.clear(key);
+        // Bumping the token version revokes every token issued so far; the caller gets a fresh one.
         user.setSenhaHash(encoder.encode(request.newPassword()));
-        user.invalidateSessions(); // todos os tokens emitidos até agora deixam de valer
+        user.invalidateSessions();
         audit.passwordChanged(userId, ip);
         return toLoginResponse(user);
     }

@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Regras da área do paciente. Todo método recebe o id do paciente que veio do TOKEN (nunca da URL ou do
- * corpo) e filtra os dados por ele: assim cada paciente só enxerga e altera o que é seu.
+ * Patient-area rules. Every method receives the patient id taken from the JWT (never from the URL or body)
+ * and filters by it, so a patient can only read and change their own data.
  */
 @Service
 public class PatientAreaService {
@@ -43,8 +43,6 @@ public class PatientAreaService {
         this.users = users;
     }
 
-    // readOnly = true: avisa o banco que é só leitura (mais leve) e mantém a sessão aberta para ler
-    // dados "lazy" (médico, medicamentos) ao montar a resposta.
     @Transactional(readOnly = true)
     public List<AppointmentResponse> listAppointments(Long patientId) {
         return appointments.findByPatientIdOrderByDateDescIdDesc(patientId).stream()
@@ -68,29 +66,27 @@ public class PatientAreaService {
 
     @Transactional
     public TrackingResponse startTracking(Long patientId, StartTrackingRequest request) {
-        // 1) A receita precisa ser DESTE paciente. Receita de outra pessoa responde "não encontrada".
+        // Someone else's prescription looks like a missing one (404), so ids cannot be probed.
         Prescription prescription = prescriptions
                 .findByIdAndPatientId(request.prescriptionId(), patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Receita não encontrada."));
 
-        // 2) O remédio precisa constar nessa receita
         PrescribedMedication medication = prescription.getItems().stream()
                 .filter(item -> item.getName().equals(request.medicationName()))
                 .findFirst()
                 .orElseThrow(() -> new BusinessRuleException("Este medicamento não consta na receita."));
 
-        // 3) Não pode acompanhar duas vezes o mesmo remédio da mesma receita
         if (trackings.existsByPatientIdAndPrescriptionIdAndMedicationName(
                 patientId, prescription.getId(), medication.getName())) {
             throw new ConflictException("Este remédio já está em acompanhamento.");
         }
 
         MedicationTracking tracking = new MedicationTracking();
-        // getReferenceById: usa o paciente só como "chave estrangeira", sem buscá-lo no banco
         tracking.setPatient(users.getReferenceById(patientId));
         tracking.setPrescription(prescription);
         tracking.setMedicationName(medication.getName());
-        tracking.setDosage(medication.getDosage()); // vem da receita, não do cliente
+        // Taken from the prescription, never from the client.
+        tracking.setDosage(medication.getDosage());
         tracking.setStartDate(request.startDate());
         tracking.setTotalQuantity(request.quantity());
         tracking.setRemainingQuantity(request.quantity());
@@ -98,7 +94,6 @@ public class PatientAreaService {
         try {
             return TrackingResponse.from(trackings.saveAndFlush(tracking));
         } catch (DataIntegrityViolationException e) {
-            // Dois pedidos simultâneos passam pela checagem acima; a restrição UNIQUE do banco é a garantia final.
             throw new ConflictException("Este remédio já está em acompanhamento.");
         }
     }
@@ -106,7 +101,7 @@ public class PatientAreaService {
     @Transactional
     public TrackingResponse registerDose(Long patientId, Long trackingId) {
         MedicationTracking tracking = findOwnedTracking(patientId, trackingId);
-        tracking.takeDose(); // ao fechar a transação o Hibernate grava a mudança sozinho (dirty checking)
+        tracking.takeDose();
         return TrackingResponse.from(tracking);
     }
 

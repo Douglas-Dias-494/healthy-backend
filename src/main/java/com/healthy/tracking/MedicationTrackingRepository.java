@@ -9,7 +9,6 @@ public interface MedicationTrackingRepository extends JpaRepository<MedicationTr
 
     List<MedicationTracking> findByPatientIdOrderByIdAsc(Long patientId);
 
-    /** Sempre filtra pelo dono: o id sozinho nunca basta. */
     Optional<MedicationTracking> findByIdAndPatientId(Long id, Long patientId);
 
     boolean existsByPatientIdAndPrescriptionIdAndMedicationName(Long patientId, Long prescriptionId, String medicationName);

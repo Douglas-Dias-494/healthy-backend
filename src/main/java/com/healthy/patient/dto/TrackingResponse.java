@@ -5,7 +5,6 @@ import com.healthy.tracking.MedicationTracking;
 
 import java.time.LocalDate;
 
-/** Espelha Acompanhamento do Angular. */
 public record TrackingResponse(
         Long id,
         @JsonProperty("receitaId") Long prescriptionId,
@@ -18,7 +17,7 @@ public record TrackingResponse(
     public static TrackingResponse from(MedicationTracking tracking) {
         return new TrackingResponse(
                 tracking.getId(),
-                tracking.getPrescription().getId(), // a receita é um "proxy": ler o id não vai ao banco
+                tracking.getPrescription().getId(),
                 tracking.getMedicationName(),
                 tracking.getDosage(),
                 tracking.getStartDate(),

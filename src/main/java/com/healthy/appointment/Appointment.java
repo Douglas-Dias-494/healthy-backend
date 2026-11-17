@@ -8,11 +8,9 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 
-/** Uma consulta: um paciente atendido por um médico, em certa data e local. */
 @Entity
 @Table(
         name = "appointments",
-        // O mesmo atendimento (médico + paciente + data) não se repete. Criada na migração V2.
         uniqueConstraints = @UniqueConstraint(columnNames = {"doctor_id", "patient_id", "appointment_date"}))
 @Getter
 @Setter
@@ -23,7 +21,6 @@ public class Appointment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // LAZY: só busca o usuário no banco quando alguém realmente ler os dados dele
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "patient_id", nullable = false)
     private Usuario patient;
@@ -32,7 +29,6 @@ public class Appointment {
     @JoinColumn(name = "doctor_id", nullable = false)
     private Usuario doctor;
 
-    // "date" é palavra reservada em SQL; por isso o nome da coluna é outro
     @Column(name = "appointment_date", nullable = false)
     private LocalDate date;
 

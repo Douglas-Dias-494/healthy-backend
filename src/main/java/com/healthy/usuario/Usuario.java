@@ -5,11 +5,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Conta de acesso ao sistema (quem pode fazer login).
- * Não confundir com {@code Patient}, que é o perfil clínico (CPF, nascimento...).
- * Mais adiante o Patient passa a apontar para o Usuario dono dele.
- */
 @Entity
 @Table(name = "usuarios")
 @Getter
@@ -21,7 +16,6 @@ public class Usuario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // STRING grava "PACIENTE" no banco. O padrão (ORDINAL) grava 0/1 e quebra se a ordem do enum mudar.
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Perfil perfil;
@@ -29,29 +23,22 @@ public class Usuario {
     @Column(nullable = false, length = 100)
     private String nome;
 
-    // Sempre guardado em minúsculas (ver AuthService), para "Maria@x.com" e "maria@x.com" serem a mesma conta.
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
-    // Hash BCrypt da senha. A senha em si nunca é guardada.
     @Column(name = "senha_hash", nullable = false, length = 100)
     private String senhaHash;
 
-    // Só para médicos
     @Column(length = 40)
     private String crm;
 
     @Column(length = 60)
     private String especialidade;
 
-    /**
-     * Versão dos tokens deste usuário. Todo JWT carrega a versão com que foi emitido, e só vale se ela for
-     * igual à atual (ver PasswordChangeTokenValidator). Trocar a senha soma 1 e encerra todas as sessões antigas.
-     */
+    // Bumped on password change/reset. JWTs carry the version they were issued with (see PasswordChangeTokenValidator).
     @Column(name = "token_version", nullable = false)
     private int tokenVersion;
 
-    /** Invalida todos os tokens já emitidos para este usuário. */
     public void invalidateSessions() {
         tokenVersion++;
     }
